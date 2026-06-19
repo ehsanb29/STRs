@@ -19,33 +19,71 @@ L_FLANK = as.numeric(stringr::str_split(stringr::str_remove(stringr::str_split(D
 R_FLANK = as.numeric(stringr::str_split(stringr::str_remove(stringr::str_split(DAT,"_")[[1]][9],"R"),",")[[1]])
 
 # Load individual read data
-tab=data.table::fread(paste0("IID_",ID,".txt"),h=F,sep=" "); 
+tab=data.table::fread(paste0("IID_",ID,".txt"),h=F,sep=" ");
+cat("DEBUG: Loaded", nrow(tab), "reads for individual", ID, "\n")
+cat("DEBUG: Command line args - ID:", ID, "DAT:", DAT, "\n") 
 
 # Builds a consensus sequence from multiple reads and associated qualities
 # Aligns sequences by a known start location and calculates the most frequent base at each position
 consensus = function(SEQUENCES,QUALITIES,START){
   if(length(SEQUENCES) == 1){ return(SEQUENCES) }
   else{
+    # Align sequences by the known start location, then for each position take the most common base among high-quality bases (QUAL>=25).
     START_LOCS = as.data.frame(stringr::str_locate(string= SEQUENCES, START)) ; SEQUENCES = stringr::str_split(SEQUENCES,"");
     QUALITIES = stringr::str_split(QUALITIES,""); SEQdf = data.frame(SPOT=seq(-156,156,by=1),SEQ="",QUAL="",stringsAsFactors = F)
+    
+    # Debug:
+    print("DEBUG: START_LOCS structure:")
+    print(str(START_LOCS))
+    # print SEQdf structure
+    cat("DEBUG: SEQdf structure:\n")
+    print(str(SEQdf))
+
     for(i in 1:length(SEQUENCES)){
       # first REP location start is at START_LOCS[i,2]-2 ; center REP to start at "0"
-      ADD = data.frame(SPOT=seq(1,length(SEQUENCES[[i]]))-START_LOCS[i,2]-2, SEQ=SEQUENCES[[i]],QUAL=QUALITIES[[i]])
-      SEQdf[SEQdf$SPOT %in% ADD$SPOT,"SEQ"] = paste0(SEQdf[SEQdf$SPOT %in% ADD$SPOT,"SEQ"],ADD$SEQ);
-      SEQdf[SEQdf$SPOT %in% ADD$SPOT,"QUAL"] = paste0(SEQdf[SEQdf$SPOT %in% ADD$SPOT,"QUAL"],ADD$QUAL)
+      # START_LOCS[i,2] represents the starting position (column 2) of the i-th sequence alignment,
+      # used to calculate the offset for each base position in the SPOT column
+      # seq(1,length(SEQUENCES[[i]])) generates a sequence of integers from 1 to the 
+      # length of the sequence stored in SEQUENCES[[i]]. For example, if SEQUENCES[[i]] 
+      # has 100 elements, this creates: 1, 2, 3, ..., 100. This is used here to create 
+      # position indices for each base in the sequence, which are then adjusted by 
+      # subtracting the start location offset (START_LOCS[i,2] + 2) to align the 
+      # positions relative to where the read begins.
+      ADD = data.frame(SPOT=seq(1,length(SEQUENCES[[i]]))-START_LOCS[i,2]-2, SEQ=SEQUENCES[[i]],QUAL=QUALITIES[[i]]) # create a data frame with the sequence and quality for the current read, aligned by the start location
+      
+      # Debug: print ADD structure for the current read
+      cat("DEBUG: START_LOCS[i,2]:", START_LOCS[i,2], "\n")
+      cat("DEBUG: Length of SEQUENCES[[i]]:", length(SEQUENCES[[i]]), "\n")
+      # cat("DEBUG: Adjusted positions:", seq(1,length(SEQUENCES[[i]]))-START_LOCS[i,2]-2, "\n")
+
+      cat("DEBUG: ADD structure for read", i, ":\n")
+      # print(str(ADD))
+
+      SEQdf[SEQdf$SPOT %in% ADD$SPOT,"SEQ"] = paste0(SEQdf[SEQdf$SPOT %in% ADD$SPOT,"SEQ"],ADD$SEQ); 
+      SEQdf[SEQdf$SPOT %in% ADD$SPOT,"QUAL"] = paste0(SEQdf[SEQdf$SPOT %in% ADD$SPOT,"QUAL"],ADD$QUAL) 
+      # Debug: print updated SEQdf structure after processing the current read
+      cat("DEBUG: Updated SEQdf structure after processing read", i, ":\n")
+      # print(SEQdf[SEQdf$SEQ != "", ])
     }
     SEQdf = SEQdf[SEQdf$SEQ != "",]; CONSENSUS = NULL
     for(i in 1:nrow(SEQdf)){
-      # restrict to high quality bases:
-      opts= stringr::str_split(SEQdf$SEQ[i],"")[[1]][utf8ToInt(SEQdf$SEQ[i])-33 >= 25]
-      # restrict to high quality bases:
+      # # restrict to high quality bases:
+      # opts= stringr::str_split(SEQdf$SEQ[i],"")[[1]][utf8ToInt(SEQdf$SEQ[i])-33 >= 25]
+
+      # restrict to high quality bases: 
       # opts =  stringr::str_split(SEQdf$SEQ[i],"")[[1]][stringr::str_split(SEQdf$QUAL[i],"")[[1]] %in% c("F",":") ]
+      opts =  stringr::str_split(SEQdf$SEQ[i],"")[[1]][stringr::str_split(SEQdf$QUAL[i],"")[[1]] %in% c("I") ]
+      # Debug: print the options considered for consensus at the current position
+      cat("DEBUG: Position", SEQdf$SPOT[i], "- Options for consensus (high-quality bases):", opts, "\n")
       if(length(opts) > 0){
         sortedVAL = sort(table(opts),decreasing=TRUE)
+        # Debug: print the sorted values for consensus at the current position
+        cat("DEBUG: Position", SEQdf$SPOT[i], "- Sorted values for consensus:", sortedVAL, "\n")
         if(length(sortedVAL)==1){
           CONSENSUS = paste0(CONSENSUS,names(sortedVAL[1]),collapse = "")
         }else{
-          if(sortedVAL[1] == sortedVAL[2]){ # if a tie --> store X
+          # note this is a very conservative approach, but we want to be sure not to call a consensus base if there is significant disagreement among reads
+          if(sortedVAL[1] == sortedVAL[2]){ # if a tie --> store X 
             CONSENSUS = paste0(CONSENSUS,"X",collapse="")
           }else{
             CONSENSUS = paste0(CONSENSUS,names(sortedVAL[1]),collapse = "")
@@ -56,6 +94,8 @@ consensus = function(SEQUENCES,QUALITIES,START){
       }
     }
   }
+  # Debug: print the final consensus sequence
+  cat("DEBUG: Final consensus sequence:", CONSENSUS, "\n")
   return(CONSENSUS)
 }
 
@@ -243,11 +283,21 @@ mismatch_bases <- function(strand,jump,som_seq,som_qual,seq,start,end,L_flank_se
 # Check difference in length between alleles is meaningful (>= 5 repeat units)
 tab_sum_temp = tab %>% group_by(V1,V3) %>% 
   mutate(nREADs=n(),
-         midSEG = names(sort(table(as.character(V4)),decreasing=T)[1]),
+         midSEG = names(sort(table(as.character(V4)),decreasing=T)[1]), # 
          midSEGlen = stringr::str_length(names(sort(table(as.character(V4)),decreasing=T)[1])),
          SEQ = consensus(SEQUENCES= as.character(V5),QUALITIES= as.character(V6),START= STARTstr),
          QUAL = ifelse(n() == 1, as.character(V6),"Consensus")) %>% 
-  group_by(V1) %>% mutate(nALLELES=length(unique(midSEGlen))) %>% filter(nALLELES >= 2) %>% group_by(V1, nALLELES) %>% 
+  group_by(V1) %>% mutate(nALLELES=length(unique(midSEGlen))) %>% 
+  filter(nALLELES >= 2)
+
+cat("DEBUG: After nALLELES >= 2 filter:", nrow(tab_sum_temp), "rows\n")
+if(nrow(tab_sum_temp) > 0) {
+  cat("DEBUG: Unique allele lengths:", unique(tab_sum_temp$V3), "\n")
+  allele_summary <- tab_sum_temp %>% group_by(V3) %>% summarize(count=n())
+  print(allele_summary)
+}
+
+tab_sum_temp = tab_sum_temp %>% group_by(V1, nALLELES) %>% 
   mutate( A1len = midSEGlen[order(nREADs,decreasing=T)][1], 
           A2len = midSEGlen[order(nREADs,decreasing=T)][midSEGlen[order(nREADs,decreasing=T)] != A1len][1],
           A1consensus = SEQ[order(nREADs,decreasing=T)][1], 
@@ -256,8 +306,17 @@ tab_sum_temp = tab %>% group_by(V1,V3) %>%
           A2midconsensus = midSEG[order(nREADs,decreasing=T)][midSEGlen[order(nREADs,decreasing=T)] != A1len][1]) %>% 
   group_by(V1) %>%
   filter(nREADs[order(nREADs,decreasing=T)][midSEGlen[order(nREADs,decreasing=T)] != A1len][1] >= 3 & 
-           sum(nREADs[match(unique(midSEGlen), midSEGlen)] > 2) == 2 & 
+           sum(nREADs[match(unique(midSEGlen), midSEGlen)] > 2) == 2 & # both alleles supported by 3+ reads # I have changed this to '>= 2'
            abs(unique(A1len) -unique(A2len))  >= 5*repLen) 
+
+cat("DEBUG: After all filtering tab_sum_temp has", nrow(tab_sum_temp), "rows\n")
+if(nrow(tab_sum_temp) > 0) {
+  cat("DEBUG: A1len:", unique(tab_sum_temp$A1len), "bp\n")
+  cat("DEBUG: A2len:", unique(tab_sum_temp$A2len), "bp\n")
+  cat("DEBUG: Allele difference:", abs(unique(tab_sum_temp$A1len) - unique(tab_sum_temp$A2len)), "bp\n")
+  cat("DEBUG: Required difference:", 5*repLen, "bp\n")
+}
+
 if(nrow(tab_sum_temp) > 0){
   # Identify reads that don't exactly match either of the two main alleles but are within ±2 repeat units
   # Compare against consensus sequences to calculate "jump"

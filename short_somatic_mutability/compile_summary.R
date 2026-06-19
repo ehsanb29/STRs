@@ -1,44 +1,3 @@
-To extract information from confident heterozygotes necessary to compute rates of somatic expansion of short alleles two scripts are needed ``somatic.sh`` and ``short_somatic_perIndividual.R``. 
-
-Then in a directory with a reference genome fasta file and the 2 necessary scripts, one can run the script with the following command:
-```
-bash somatic.sh PATH_TO_CRAM_FILE LOCUS_CONSIDERED
-```
-where ``PATH_TO_CRAM_FILE`` is the path to a cram file of interest, and ``LOCUS_CONSIDERED`` is a string of the following format: ``LOCUS_CHR_STARTBP_ENDBP_STARTstr_ENDstr_REP_L6,9_R,`` where ``LOCUS, CHR, STARTBP, ENDBP`` are the locus name and location; ``STARTstr`` and ``ENDstr`` are sequences on the flank of the repeat (6 base pairs + 3 base pair of repeat sequence); ``REP`` is the repeat motif; ``LFLANK`` and ``RFLANK`` are of the format: ``{L,R}[comma-separated list of "key" flank bases]`` or ``{L,R},`` if no "key" flank bases; where a key base is one where a base error could result in there appearing to be one more or one fewer repeat unit  
-
-For example, for TCF4 one could run:
-```
-bash somatic.sh ftp://ftp.sra.ebi.ac.uk/vol1/run/ERR324/ERR3240216/HG00259.final.cram TCF4_chr18_55586154_55586228_AGGAGGAGC_AGCATGAAA_AGC_ L6,9_R,
-```
-The output is ``summary_somatic_HG00259.txt`` (included). 
-
-The columns are:
-
-``V1`` : ID of individual
-
-``V3`` : length of repeat sequence (in base pairs)
-
-``V4`` : repeat sequence of read
-
-``jump`` : jump (in repeat units) of sequence from main allele (-2,-1,1,2); for main alleles jump is coded as NA
-
-``fromLEN`` : length of repeat sequence (in base pairs) from which the read may have potentially somatically expanded/contracted from
-
-``A1len A1midconsensus`` : repeat length (in base pairs) and consensus sequence of main allele 1
-
-``A2len A2midconsensus`` : repeat length (in base pairs) and consensus sequence of main allele 2
-
-``somatic_neg2 somatic_neg1 somatic_pos1 somatic_pos2``:  indication if the read passes the "potentially-somatic" filters (1 if passes,0 otherwise) if the read originated from a -2, -1, +1, +2 jump 
-
-
-Note: scripts are currently written for 1000 Genomes formatted cram paths; for example ``ID=$( basename "$FILE" | sed 's/.final.cram//g' )``; for UK Biobank cram files this would need to be modified. 
-
-How to compile and use these ``summary_somatic_*.txt`` and what you would get if you ran this across all of UKB is included below. We assume the compiled ``summary_somatic_*.txt`` files for UKB are concatenated within ``all.txt``
-For each allele length + jump -- we need 
-(1) number of somatic reads 
-(2) number of individuals considered [n per allele] 
-
-```
 tab_sum  = read.table("all.txt",h=T)
 
 library(dplyr)
@@ -101,4 +60,3 @@ as.data.frame(rates[rates$jump == 1,] %>% arrange(fromLEN) %>% filter(n > 500) %
 25     102   34   .................................. 0.0131540600
 26     105   35  ................................... 0.0151510166
 27     108   36 .................................... 0.0000000000
-```
