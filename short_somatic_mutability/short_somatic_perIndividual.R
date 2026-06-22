@@ -3,8 +3,9 @@ options(echo=FALSE);
 param <- commandArgs(trailingOnly=T)
 
 # Get command line arguments
-ID=as.character(eval(paste(text=param[1]))); 
-DAT=as.character(eval(paste(text=param[2]))); 
+ID      = as.character(eval(paste(text=param[1])))
+DAT     = as.character(eval(paste(text=param[2])))
+OUT_DIR = as.character(eval(paste(text=param[3])))
 
 # Load necessary libraries without printing startup messages
 suppressPackageStartupMessages(library(data.table))
@@ -19,7 +20,10 @@ L_FLANK = as.numeric(stringr::str_split(stringr::str_remove(stringr::str_split(D
 R_FLANK = as.numeric(stringr::str_split(stringr::str_remove(stringr::str_split(DAT,"_")[[1]][9],"R"),",")[[1]])
 
 # Load individual read data
-tab=data.table::fread(paste0("IID_",ID,".txt"),h=F,sep=" ");
+GENE = stringr::str_split(DAT, "_")[[1]][1]
+REP  = stringr::str_split(DAT, "_")[[1]][7]
+IN_FILE = file.path(OUT_DIR, paste0("IID_", ID, "_", GENE, "_", REP, ".txt"))
+tab = data.table::fread(IN_FILE, h=F, sep=" ")
 cat("DEBUG: Loaded", nrow(tab), "reads for individual", ID, "\n")
 cat("DEBUG: Command line args - ID:", ID, "DAT:", DAT, "\n") 
 
@@ -361,5 +365,6 @@ tab_sum = tab_sum_temp %>% ungroup() %>% rowwise() %>%
    select(c(V1,V3,V4,jump,fromLEN,A1len,A1midconsensus,A2len,A2midconsensus,
             somatic_neg2,somatic_neg1,somatic_pos1,somatic_pos2))
 # --- save data
-write.table(tab_sum,paste0("summary_somatic_",ID,".txt"),row.names=F,col.names=T,quote=F)
+OUT_FILE = file.path(OUT_DIR, paste0("summary_somatic_", ID, "_", GENE, "_", REP, ".txt"))
+write.table(tab_sum, OUT_FILE, row.names=F, col.names=T, quote=F)
 } 

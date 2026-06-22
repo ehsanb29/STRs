@@ -38,7 +38,7 @@ nREADS=$(cat "${OUT_DIR}/IID_${ID}_${GENE}_${REP}.txt" | wc -l)
 echo "Number of reads in region: $nREADS"
 
 if [ $nREADS -gt 0 ]; then
-Rscript short_somatic_perIndividual.R $ID $DAT
+    Rscript short_somatic_perIndividual.R $ID $DAT $OUT_DIR
 fi
 
 # rm IID_${ID}.txt
