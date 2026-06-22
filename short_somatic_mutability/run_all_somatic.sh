@@ -70,8 +70,12 @@ while IFS= read -r CRAM_FILE || [ -n "$CRAM_FILE" ]; do
         echo "  Using sorted file: $INPUT_FILE"
     fi
 
-    bash "$SCRIPT_DIR/somatic.sh" "$INPUT_FILE" "$LOCUS" "$OUT_DIR"
+    if [[ "$CRAM_FILE" == *.bam ]]; then
+        bash "$SCRIPT_DIR/somatic_on_EH_bams.sh" "$INPUT_FILE" "$LOCUS" "$OUT_DIR"
+    else
+        bash "$SCRIPT_DIR/somatic.sh" "$INPUT_FILE" "$LOCUS" "$OUT_DIR"
+    fi
 
 done < "$CRAM_LIST"
 
-echo "Done. Processed $count CRAM file(s)."
+echo "Done. Processed $count file(s)."
