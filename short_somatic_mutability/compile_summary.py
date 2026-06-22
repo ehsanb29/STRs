@@ -1,6 +1,7 @@
 # This script compiles the summary of somatic mutability rates for short STRs based on the output from short_somatic_perIndividual.R. It calculates the number of somatic reads, the expected number of reads, and the rate of somatic mutations for each allele length and repeat sequence. The results are filtered to include only expansions (jump == 1) with more than 500 individuals and are saved to a CSV file.
-# Usage: python compile_summary.py <input_file_list>
+# Usage: python compile_summary.py <input_file_list> [min_n]
 #   <input_file_list>: a text file with one summary file path per line (default: file_list.txt)
+#   <min_n>: minimum number of individuals per allele to include in output (default: 500)
 
 import pandas as pd
 import numpy as np
@@ -9,6 +10,7 @@ import sys
 
 # Read the input file list
 input_list = sys.argv[1] if len(sys.argv) > 1 else "file_list.txt"
+min_n = int(sys.argv[2]) if len(sys.argv) > 2 else 500
 with open(input_list) as f:
     summary_files = [line.strip() for line in f if line.strip()]
 
@@ -110,7 +112,7 @@ rates = df_complete[['jump', 'fromLEN', 'relevantALLELE', 'nDENOMINATOR', 'n', '
 # Filter and format results
 results = rates[rates['jump'] == 1].copy()
 results = results.sort_values('fromLEN')
-results = results[results['n'] > 500]
+results = results[results['n'] > min_n]
 results['fromLEN'] = results['fromLEN'].astype(int)
 results['Alen'] = (results['fromLEN'] / 3).astype(int)
 results['relevantA'] = results['relevantALLELE'].apply(lambda x: re.sub(r'AGC', '.', x))
