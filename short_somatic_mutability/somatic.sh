@@ -37,9 +37,9 @@ print iid,(and($2,16)==0?"forward":"reverse"),length(STARTSEQ_TOADD segMID[1] EN
 nREADS=$(cat "${OUT_DIR}/IID_${ID}_${GENE}_${REP}.txt" | wc -l)
 echo "Number of reads in region: $nREADS"
 
-# if [ $nREADS -gt 0 ]; then
-# # Rscript short_somatic_perIndividual.R $ID $DAT
-# fi
+if [ $nREADS -gt 0 ]; then
+Rscript short_somatic_perIndividual.R $ID $DAT
+fi
 
 # rm IID_${ID}.txt
 # Clean up index files more safely (only remove the one we created)
