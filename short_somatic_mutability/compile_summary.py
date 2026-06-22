@@ -25,7 +25,7 @@ def sem(x):
 repLen = 3
 
 # Number of individuals per allele:
-print(tab_sum.columns)
+# print(tab_sum.columns)
 number_per_allele = tab_sum[["V1", "A1len", "A1midconsensus", "A2len", "A2midconsensus"]].drop_duplicates()
 allele_cts = pd.DataFrame({
     'A': pd.concat([number_per_allele['A1len'], number_per_allele['A2len']], ignore_index=True),
@@ -103,17 +103,16 @@ df_complete = df_complete.merge(
     right_on=['A', 'Aseq']
 )
 
-# Calculate rates
-rates = df_complete.groupby(['jump', 'fromLEN', 'relevantALLELE', 'nDENOMINATOR', 'n']).apply(
-    lambda x: (x['nSomatic_reads'].sum() / x['n'].iloc[0]) / x['DENOMINATOR'].iloc[0]
-).reset_index()
-rates.rename(columns={rates.columns[-1]: 'rate'}, inplace=True)
+# Calculate rates (vectorised — df_complete is already unique per group after the two merges)
+df_complete['rate'] = (df_complete['nSomatic_reads'] / df_complete['n']) / df_complete['DENOMINATOR']
+rates = df_complete[['jump', 'fromLEN', 'relevantALLELE', 'nDENOMINATOR', 'n', 'rate']].copy()
 
 # Filter and format results
 results = rates[rates['jump'] == 1].copy()
 results = results.sort_values('fromLEN')
 results = results[results['n'] > 500]
-results['Alen'] = results['fromLEN'] / 3
+results['fromLEN'] = results['fromLEN'].astype(int)
+results['Alen'] = (results['fromLEN'] / 3).astype(int)
 results['relevantA'] = results['relevantALLELE'].apply(lambda x: re.sub(r'AGC', '.', x))
 results = results[['fromLEN', 'Alen', 'relevantA', 'rate']]
 
@@ -124,4 +123,4 @@ results.index = results.index + 1  # Start index at 1 like R
 print(results)
 
 # Optionally save to CSV
-results.to_csv('output.csv')
+results.to_csv('output.csv', index=False)
