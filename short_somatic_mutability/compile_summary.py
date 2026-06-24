@@ -94,16 +94,26 @@ denominator_cts = denominator_df.groupby(['V3', 'jump']).agg({
 denominator_cts.columns = ['V3', 'jump', 'nDENOMINATOR', 'DENOMINATOR', 'SEM_DENOMINATOR']
 denominator_cts['fromLEN'] = denominator_cts['V3'] - denominator_cts['jump'] * repLen
 
+# Diagnostics: show intermediate tables to help trace empty results
+print(f"[diag] somatic_cts rows: {len(somatic_cts)}")
+print(f"[diag] somatic_cts (jump, fromLEN) sample:\n{somatic_cts[['jump','fromLEN']].drop_duplicates().sort_values(['jump','fromLEN']).to_string(index=False)}")
+print(f"[diag] denominator_cts rows: {len(denominator_cts)}")
+print(f"[diag] denominator_cts (jump, fromLEN) sample:\n{denominator_cts[['jump','fromLEN']].drop_duplicates().sort_values(['jump','fromLEN']).to_string(index=False)}")
+print(f"[diag] allele_cts rows: {len(allele_cts)}")
+print(f"[diag] allele_cts sample:\n{allele_cts.sort_values('A').to_string(index=False)}")
+
 # Merge dataframes
 df_complete = somatic_cts.merge(
     denominator_cts[['jump', 'fromLEN', 'nDENOMINATOR', 'DENOMINATOR', 'SEM_DENOMINATOR']], 
     on=['jump', 'fromLEN']
 )
+print(f"[diag] df_complete after merge 1 (somatic x denominator): {len(df_complete)} rows")
 df_complete = df_complete.merge(
     allele_cts, 
     left_on=['fromLEN', 'relevantALLELE'], 
     right_on=['A', 'Aseq']
 )
+print(f"[diag] df_complete after merge 2 (x allele_cts): {len(df_complete)} rows")
 
 # Calculate rates (vectorised — df_complete is already unique per group after the two merges)
 df_complete['rate'] = (df_complete['nSomatic_reads'] / df_complete['n']) / df_complete['DENOMINATOR']
